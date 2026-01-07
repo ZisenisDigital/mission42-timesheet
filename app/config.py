@@ -53,7 +53,13 @@ class SettingsManager:
 
         # Fetch all settings from PocketBase
         try:
-            records = self.pb.collection("settings").get_full_list()
+            # Check if pb is a wrapper with get_full_list method or raw client
+            if hasattr(self.pb, 'get_full_list'):
+                # It's a PocketBaseClient wrapper
+                records = self.pb.get_full_list("settings")
+            else:
+                # It's a raw PocketBase SDK client
+                records = self.pb.collection("settings").get_full_list()
         except ClientResponseError as e:
             if e.status == 404:
                 raise ValueError(
@@ -64,9 +70,16 @@ class SettingsManager:
         # Convert records to flat dictionary
         settings_dict = {}
         for record in records:
-            key = record.key
-            value = self._parse_value(record.value, record.type)
-            settings_dict[key] = value
+            # Access record fields using getattr for compatibility
+            key = getattr(record, 'key', None)
+            value = getattr(record, 'value', None)
+            record_type = getattr(record, 'type', 'string')
+
+            if key is None or value is None:
+                continue  # Skip invalid records
+
+            parsed_value = self._parse_value(value, record_type)
+            settings_dict[key] = parsed_value
 
         # Validate we have all required settings (31 total: 10+1+2+3+5+1+7+2)
         expected_count = 31
@@ -94,8 +107,16 @@ class SettingsManager:
             ClientResponseError: If setting not found or request fails
         """
         try:
-            record = self.pb.collection("settings").get_first_list_item(f'key="{key}"')
-            return self._parse_value(record.value, record.type)
+            if hasattr(self.pb, 'get_first_list_item'):
+                # It's a PocketBaseClient wrapper
+                record = self.pb.get_first_list_item("settings", f'key="{key}"')
+            else:
+                # It's a raw PocketBase SDK client
+                record = self.pb.collection("settings").get_first_list_item(f'key="{key}"')
+
+            value = getattr(record, 'value', None)
+            record_type = getattr(record, 'type', 'string')
+            return self._parse_value(value, record_type)
         except ClientResponseError as e:
             if e.status == 404:
                 raise KeyError(f"Setting '{key}' not found")
@@ -114,13 +135,23 @@ class SettingsManager:
         """
         try:
             # Get existing record
-            record = self.pb.collection("settings").get_first_list_item(f'key="{key}"')
+            if hasattr(self.pb, 'get_first_list_item'):
+                # It's a PocketBaseClient wrapper
+                record = self.pb.get_first_list_item("settings", f'key="{key}"')
+            else:
+                # It's a raw PocketBase SDK client
+                record = self.pb.collection("settings").get_first_list_item(f'key="{key}"')
 
             # Convert value to string for storage
             str_value = self._value_to_string(value)
 
             # Update in PocketBase
-            self.pb.collection("settings").update(record.id, {"value": str_value})
+            if hasattr(self.pb, 'update'):
+                # It's a PocketBaseClient wrapper
+                self.pb.update("settings", record.id, {"value": str_value})
+            else:
+                # It's a raw PocketBase SDK client
+                self.pb.collection("settings").update(record.id, {"value": str_value})
 
             # Invalidate cache
             self._cache = None
@@ -237,23 +268,24 @@ class Config:
         self._pb_client: Optional[PocketBase] = None
         self._settings_manager: Optional[SettingsManager] = None
 
-    def setup_pocketbase(self, pb_client: PocketBase) -> None:
+    def setup_pocketbase(self, pb_client) -> None:
         """
         Set up PocketBase client and settings manager.
 
         Args:
-            pb_client: Authenticated PocketBase client
+            pb_client: Authenticated PocketBase client (can be PocketBaseClient wrapper or raw client)
         """
         self._pb_client = pb_client
+        # SettingsManager now handles both wrappers and raw clients
         self._settings_manager = SettingsManager(pb_client)
 
     @property
-    def settings(self) -> SettingsManager:
+    def settings(self):
         """
-        Get settings manager.
+        Get settings from PocketBase.
 
         Returns:
-            SettingsManager instance
+            Settings instance with all configuration
 
         Raises:
             RuntimeError: If PocketBase not set up yet
@@ -262,7 +294,7 @@ class Config:
             raise RuntimeError(
                 "Settings manager not initialized. Call setup_pocketbase() first."
             )
-        return self._settings_manager
+        return self._settings_manager.get_all()
 
     def validate(self) -> list[str]:
         """

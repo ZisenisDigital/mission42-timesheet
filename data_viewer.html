@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission42 Timesheet - Data Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f5f5f5;
+            border-bottom: 2px solid #e0e0e0;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1em;
+            color: #666;
+            transition: all 0.3s;
+            border-bottom: 3px solid transparent;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: 600;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .collection-section {
+            display: none;
+        }
+
+        .collection-section.active {
+            display: block;
+        }
+
+        .info-bar {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .info-bar .count {
+            font-size: 0.95em;
+            color: #666;
+        }
+
+        .info-bar .count strong {
+            color: #667eea;
+            font-size: 1.3em;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .data-display {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .data-display pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            line-height: 1.5;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        thead {
+            background: #667eea;
+            color: white;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+
+        .badge-core { background: #e3f2fd; color: #1976d2; }
+        .badge-wakatime { background: #fff3e0; color: #f57c00; }
+        .badge-calendar { background: #f3e5f5; color: #7b1fa2; }
+        .badge-gmail { background: #ffebee; color: #c62828; }
+        .badge-github { background: #e8f5e9; color: #388e3c; }
+        .badge-cloud { background: #e1f5fe; color: #0277bd; }
+        .badge-processing { background: #fce4ec; color: #c2185b; }
+        .badge-export { background: #f1f8e9; color: #558b2f; }
+
+        .badge-active { background: #e8f5e9; color: #388e3c; }
+        .badge-inactive { background: #ffebee; color: #c62828; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border-left: 4px solid #c62828;
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #388e3c;
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+            border-left: 4px solid #388e3c;
+        }
+
+        .success-message.show {
+            display: block;
+            animation: fadeOut 3s forwards;
+        }
+
+        @keyframes fadeOut {
+            0%, 70% { opacity: 1; }
+            100% { opacity: 0; display: none; }
+        }
+
+        .copy-btn {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .copy-btn::after {
+            content: '✓ Copied!';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #388e3c;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translateY(-100%);
+            transition: transform 0.3s;
+        }
+
+        .copy-btn.copied::after {
+            transform: translateY(0);
+        }
+
+        .endpoint-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+
+        .endpoint-info code {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5em;
+            }
+
+            .info-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .tabs {
+                flex-wrap: nowrap;
+            }
+
+            .tab {
+                font-size: 0.9em;
+                padding: 12px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Mission42 Timesheet - Data Viewer</h1>
+            <p>View and copy all your timesheet data</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('settings')">Settings (31)</button>
+            <button class="tab" onclick="switchTab('work_packages')">Work Packages (6)</button>
+            <button class="tab" onclick="switchTab('project_specs')">Project Specs (6)</button>
+            <button class="tab" onclick="switchTab('raw_events')">Raw Events</button>
+            <button class="tab" onclick="switchTab('time_blocks')">Time Blocks</button>
+            <button class="tab" onclick="switchTab('week_summaries')">Week Summaries</button>
+            <button class="tab" onclick="switchTab('calendar_accounts')">Calendar Accounts</button>
+            <button class="tab" onclick="switchTab('email_accounts')">Email Accounts</button>
+        </div>
+
+        <div class="content">
+            <div id="success-message" class="success-message"></div>
+
+            <!-- Settings -->
+            <div id="settings" class="collection-section active">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="settings-count">-</strong> settings</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('settings')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('settings')">📋 Copy JSON</button>
+                        <button class="btn btn-primary" onclick="copyTable('settings')">📋 Copy Table</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/settings/records</code>
+                </div>
+                <div id="settings-table" class="table-container">
+                    <div class="loading">Loading settings</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="settings-json"></pre>
+                </div>
+            </div>
+
+            <!-- Work Packages -->
+            <div id="work_packages" class="collection-section">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="work_packages-count">-</strong> work packages</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('work_packages')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('work_packages')">📋 Copy JSON</button>
+                        <button class="btn btn-primary" onclick="copyTable('work_packages')">📋 Copy Table</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/work_packages/records</code>
+                </div>
+                <div id="work_packages-table" class="table-container">
+                    <div class="loading">Loading work packages</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="work_packages-json"></pre>
+                </div>
+            </div>
+
+            <!-- Project Specs -->
+            <div id="project_specs" class="collection-section">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="project_specs-count">-</strong> project specs</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('project_specs')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('project_specs')">📋 Copy JSON</button>
+                        <button class="btn btn-primary" onclick="copyTable('project_specs')">📋 Copy Table</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/project_specs/records</code>
+                </div>
+                <div id="project_specs-table" class="table-container">
+                    <div class="loading">Loading project specs</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="project_specs-json"></pre>
+                </div>
+            </div>
+
+            <!-- Raw Events -->
+            <div id="raw_events" class="collection-section">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="raw_events-count">-</strong> raw events</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('raw_events')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('raw_events')">📋 Copy JSON</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/raw_events/records</code>
+                </div>
+                <div id="raw_events-table" class="table-container">
+                    <div class="loading">Loading raw events</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="raw_events-json"></pre>
+                </div>
+            </div>
+
+            <!-- Time Blocks -->
+            <div id="time_blocks" class="collection-section">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="time_blocks-count">-</strong> time blocks</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('time_blocks')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('time_blocks')">📋 Copy JSON</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/time_blocks/records</code>
+                </div>
+                <div id="time_blocks-table" class="table-container">
+                    <div class="loading">Loading time blocks</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="time_blocks-json"></pre>
+                </div>
+            </div>
+
+            <!-- Week Summaries -->
+            <div id="week_summaries" class="collection-section">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="week_summaries-count">-</strong> week summaries</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('week_summaries')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('week_summaries')">📋 Copy JSON</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/week_summaries/records</code>
+                </div>
+                <div id="week_summaries-table" class="table-container">
+                    <div class="loading">Loading week summaries</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="week_summaries-json"></pre>
+                </div>
+            </div>
+
+            <!-- Calendar Accounts -->
+            <div id="calendar_accounts" class="collection-section">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="calendar_accounts-count">-</strong> calendar accounts</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('calendar_accounts')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('calendar_accounts')">📋 Copy JSON</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/calendar_accounts/records</code>
+                </div>
+                <div id="calendar_accounts-table" class="table-container">
+                    <div class="loading">Loading calendar accounts</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="calendar_accounts-json"></pre>
+                </div>
+            </div>
+
+            <!-- Email Accounts -->
+            <div id="email_accounts" class="collection-section">
+                <div class="info-bar">
+                    <div class="count">Total: <strong id="email_accounts-count">-</strong> email accounts</div>
+                    <div class="actions">
+                        <button class="btn btn-secondary" onclick="loadData('email_accounts')">🔄 Refresh</button>
+                        <button class="btn btn-primary copy-btn" onclick="copyJSON('email_accounts')">📋 Copy JSON</button>
+                    </div>
+                </div>
+                <div class="endpoint-info">
+                    <strong>API Endpoint:</strong> <code>http://127.0.0.1:8090/api/collections/email_accounts/records</code>
+                </div>
+                <div id="email_accounts-table" class="table-container">
+                    <div class="loading">Loading email accounts</div>
+                </div>
+                <div class="data-display">
+                    <h3 style="margin-bottom: 15px;">JSON Data</h3>
+                    <pre id="email_accounts-json"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pbUrl = 'http://127.0.0.1:8090';
+        let currentData = {};
+
+        // Load data on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData('settings');
+        });
+
+        function switchTab(collection) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Update sections
+            document.querySelectorAll('.collection-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(collection).classList.add('active');
+
+            // Load data if not already loaded
+            if (!currentData[collection]) {
+                loadData(collection);
+            }
+        }
+
+        async function loadData(collection) {
+            const tableDiv = document.getElementById(`${collection}-table`);
+            const jsonPre = document.getElementById(`${collection}-json`);
+            const countSpan = document.getElementById(`${collection}-count`);
+
+            tableDiv.innerHTML = '<div class="loading">Loading data</div>';
+            jsonPre.textContent = '';
+
+            try {
+                const response = await fetch(`${pbUrl}/api/collections/${collection}/records`);
+                const data = await response.json();
+
+                currentData[collection] = data;
+
+                // Update count
+                countSpan.textContent = data.items.length;
+
+                // Display table
+                if (data.items.length > 0) {
+                    tableDiv.innerHTML = renderTable(collection, data.items);
+                } else {
+                    tableDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;">No records found</div>';
+                }
+
+                // Display JSON
+                jsonPre.textContent = JSON.stringify(data.items, null, 2);
+
+            } catch (error) {
+                tableDiv.innerHTML = `<div class="error">Error loading data: ${error.message}</div>`;
+                console.error('Error:', error);
+            }
+        }
+
+        function renderTable(collection, items) {
+            if (collection === 'settings') {
+                return renderSettingsTable(items);
+            } else if (collection === 'work_packages') {
+                return renderWorkPackagesTable(items);
+            } else if (collection === 'project_specs') {
+                return renderProjectSpecsTable(items);
+            } else {
+                return renderGenericTable(items);
+            }
+        }
+
+        function renderSettingsTable(items) {
+            const grouped = items.reduce((acc, item) => {
+                if (!acc[item.category]) acc[item.category] = [];
+                acc[item.category].push(item);
+                return acc;
+            }, {});
+
+            let html = '<table><thead><tr><th>Key</th><th>Value</th><th>Type</th><th>Category</th><th>Description</th></tr></thead><tbody>';
+
+            for (const [category, settings] of Object.entries(grouped)) {
+                for (const setting of settings) {
+                    html += `
+                        <tr>
+                            <td><strong>${setting.key}</strong></td>
+                            <td>${setting.value}</td>
+                            <td>${setting.type}</td>
+                            <td><span class="badge badge-${category}">${category}</span></td>
+                            <td style="color: #666; font-size: 0.9em;">${setting.description || '-'}</td>
+                        </tr>
+                    `;
+                }
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderWorkPackagesTable(items) {
+            let html = '<table><thead><tr><th>Name</th><th>Description</th><th>Status</th><th>Default</th></tr></thead><tbody>';
+
+            for (const item of items) {
+                const isActive = item.is_active;
+                const isDefault = item.is_default;
+                html += `
+                    <tr>
+                        <td><strong>${item.name}</strong></td>
+                        <td style="color: #666;">${item.description || '-'}</td>
+                        <td><span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+                        <td>${isDefault ? '⭐ Default' : '-'}</td>
+                    </tr>
+                `;
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderProjectSpecsTable(items) {
+            let html = '<table><thead><tr><th>Name</th><th>Description</th><th>Work Package</th><th>Status</th></tr></thead><tbody>';
+
+            for (const item of items) {
+                const isActive = item.is_active;
+                html += `
+                    <tr>
+                        <td><strong>${item.name}</strong></td>
+                        <td style="color: #666;">${item.description || '-'}</td>
+                        <td>${item.work_package || '-'}</td>
+                        <td><span class="badge ${isActive ? 'badge-active' : 'badge-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+                    </tr>
+                `;
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderGenericTable(items) {
+            if (items.length === 0) return '';
+
+            const keys = Object.keys(items[0]).filter(k => !['id', 'collectionId', 'collectionName'].includes(k));
+
+            let html = '<table><thead><tr>';
+            for (const key of keys) {
+                html += `<th>${key}</th>`;
+            }
+            html += '</tr></thead><tbody>';
+
+            for (const item of items) {
+                html += '<tr>';
+                for (const key of keys) {
+                    let value = item[key];
+                    if (typeof value === 'object') value = JSON.stringify(value);
+                    html += `<td>${value || '-'}</td>`;
+                }
+                html += '</tr>';
+            }
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        async function copyJSON(collection) {
+            const data = currentData[collection];
+            if (!data) return;
+
+            const text = JSON.stringify(data.items, null, 2);
+            await navigator.clipboard.writeText(text);
+
+            showSuccess('JSON copied to clipboard!');
+
+            // Button animation
+            const btn = event.target;
+            btn.classList.add('copied');
+            setTimeout(() => btn.classList.remove('copied'), 2000);
+        }
+
+        async function copyTable(collection) {
+            const tableDiv = document.getElementById(`${collection}-table`);
+            const table = tableDiv.querySelector('table');
+            if (!table) return;
+
+            // Convert table to TSV (tab-separated values)
+            let tsv = '';
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('th, td');
+                const values = Array.from(cells).map(cell => cell.textContent.trim());
+                tsv += values.join('\t') + '\n';
+            });
+
+            await navigator.clipboard.writeText(tsv);
+            showSuccess('Table copied to clipboard! (Paste into Excel/Google Sheets)');
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success-message');
+            successDiv.textContent = message;
+            successDiv.classList.add('show');
+            setTimeout(() => successDiv.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

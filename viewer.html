@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission42 Timesheet Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .login-card, .viewer-card {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .login-card {
+            max-width: 400px;
+            margin: 100px auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c33;
+        }
+
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3c3;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .user-info {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: #dc3545;
+            width: auto;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            color: #666;
+            width: auto;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge.core { background: #e3f2fd; color: #1976d2; }
+        .badge.github { background: #f3e5f5; color: #7b1fa2; }
+        .badge.wakatime { background: #fff3e0; color: #f57c00; }
+        .badge.processing { background: #e8f5e9; color: #388e3c; }
+        .badge.export { background: #fce4ec; color: #c2185b; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-card">
+        <h1>🕐 Timesheet Viewer</h1>
+        <p class="subtitle">Read-only access to timesheet data</p>
+
+        <div id="loginError" class="error hidden"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" value="viewer@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" value="ViewerPass123" required>
+            </div>
+
+            <div class="form-group">
+                <label for="pbUrl">PocketBase URL</label>
+                <input type="text" id="pbUrl" value="http://127.0.0.1:8090" required>
+            </div>
+
+            <button type="submit" id="loginBtn">Login</button>
+        </form>
+    </div>
+
+    <!-- Main Viewer Screen -->
+    <div id="viewerScreen" class="container hidden">
+        <div class="viewer-card">
+            <div class="header">
+                <div>
+                    <h1>🕐 Timesheet Data</h1>
+                    <div class="user-info">
+                        Logged in as: <strong id="userEmail"></strong>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalSettings">-</div>
+                    <div class="stat-label">Total Settings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="weekHours">-</div>
+                    <div class="stat-label">Target Hours/Week</div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('settings')">Settings</button>
+                <button class="tab" onclick="showTab('about')">About</button>
+            </div>
+
+            <div id="settingsTab" class="tab-content active">
+                <div id="loadingSettings" class="loading">Loading settings...</div>
+                <table id="settingsTable" class="data-table hidden">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Value</th>
+                            <th>Type</th>
+                            <th>Category</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <div id="aboutTab" class="tab-content">
+                <h2>About This Viewer</h2>
+                <p style="margin-top: 15px; color: #666;">
+                    This is a read-only viewer for Mission42 Timesheet data.
+                    You can view system settings, timesheet blocks, and summaries.
+                </p>
+                <h3 style="margin-top: 25px;">Your Permissions:</h3>
+                <ul style="margin-top: 10px; margin-left: 20px; color: #666;">
+                    <li>✅ View all timesheet data</li>
+                    <li>✅ See weekly summaries</li>
+                    <li>✅ Read system settings</li>
+                    <li>❌ Cannot edit or delete records</li>
+                    <li>❌ Cannot access admin console</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let pbUrl = null;
+        let userData = null;
+
+        // Login handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            pbUrl = document.getElementById('pbUrl').value;
+
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+
+            try {
+                const response = await fetch(`${pbUrl}/api/collections/users/auth-with-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        identity: email,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Login failed');
+                }
+
+                authToken = data.token;
+                userData = data.record;
+
+                // Save to sessionStorage
+                sessionStorage.setItem('authToken', authToken);
+                sessionStorage.setItem('pbUrl', pbUrl);
+                sessionStorage.setItem('userData', JSON.stringify(userData));
+
+                showViewerScreen();
+
+            } catch (error) {
+                const errorDiv = document.getElementById('loginError');
+                errorDiv.textContent = error.message || 'Login failed. Please check your credentials.';
+                errorDiv.classList.remove('hidden');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        });
+
+        // Check if already logged in
+        window.addEventListener('load', () => {
+            const savedToken = sessionStorage.getItem('authToken');
+            const savedPbUrl = sessionStorage.getItem('pbUrl');
+            const savedUserData = sessionStorage.getItem('userData');
+
+            if (savedToken && savedPbUrl && savedUserData) {
+                authToken = savedToken;
+                pbUrl = savedPbUrl;
+                userData = JSON.parse(savedUserData);
+                showViewerScreen();
+            }
+        });
+
+        function showViewerScreen() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('viewerScreen').classList.remove('hidden');
+            document.getElementById('userEmail').textContent = userData.email;
+
+            loadSettings();
+        }
+
+        async function loadSettings() {
+            try {
+                const response = await fetch(`${pbUrl}/api/collections/settings/records`, {
+                    headers: { 'Authorization': authToken }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to load settings');
+                }
+
+                document.getElementById('loadingSettings').classList.add('hidden');
+                document.getElementById('settingsTable').classList.remove('hidden');
+
+                const tbody = document.querySelector('#settingsTable tbody');
+                tbody.innerHTML = '';
+
+                // Update stats
+                document.getElementById('totalSettings').textContent = data.totalItems;
+
+                // Find target hours
+                const targetHours = data.items.find(s => s.key === 'target_hours_per_week');
+                if (targetHours) {
+                    document.getElementById('weekHours').textContent = targetHours.value;
+                }
+
+                // Populate table
+                data.items.forEach(setting => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td><strong>${setting.key}</strong><br><small style="color: #999;">${setting.description || ''}</small></td>
+                        <td>${setting.value}</td>
+                        <td>${setting.type}</td>
+                        <td><span class="badge ${setting.category}">${setting.category}</span></td>
+                    `;
+                });
+
+            } catch (error) {
+                document.getElementById('loadingSettings').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function logout() {
+            sessionStorage.clear();
+            authToken = null;
+            userData = null;
+            pbUrl = null;
+
+            document.getElementById('viewerScreen').classList.add('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

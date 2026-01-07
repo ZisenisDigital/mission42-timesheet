@@ -14,9 +14,10 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Depends, Response, Cookie
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.pocketbase_client import PocketBaseClient
 from app.config import Config
@@ -114,8 +115,27 @@ async def root():
         "name": "Mission42 Timesheet API",
         "version": "1.0.0",
         "status": "operational",
-        "documentation": "/docs",
-        "health": "/health",
+        "message": "Welcome to Mission42 Timesheet API! 🚀",
+        "quick_links": {
+            "interactive_viewer": "/viewer",
+            "dashboard": "/dashboard",
+            "api_documentation": "/docs",
+            "health_check": "/health",
+        },
+        "data_access": {
+            "settings": "/data/settings",
+            "work_packages": "/data/work_packages",
+            "project_specs": "/data/project_specs",
+            "raw_events": "/data/raw_events",
+            "time_blocks": "/data/time_blocks",
+        },
+        "features": [
+            "📊 Interactive data viewer with copy-to-clipboard",
+            "📈 Real-time dashboard with system stats",
+            "📅 Automated timesheet generation",
+            "🔄 Multi-source data aggregation (WakaTime, GitHub, Calendar, Gmail)",
+            "📤 Export to HTML, CSV, Excel",
+        ],
     }
 
 
@@ -225,24 +245,49 @@ async def process_specific_week(date: str):
 
 
 @app.get("/timesheet/current", tags=["Timesheet"])
-async def get_current_timesheet():
-    """Get timesheet for current month."""
+async def get_current_timesheet(auth_token: Optional[str] = Cookie(None)):
+    """Get timesheet for current month. Requires authentication."""
+    from app.utils.auth import get_current_user
+
+    # Check authentication
+    try:
+        user = get_current_user(auth_token)
+    except HTTPException:
+        # Redirect to login
+        return RedirectResponse(url="/login", status_code=303)
+
     now = datetime.now()
-    return await get_timesheet_month(now.year, now.month)
+    return await get_timesheet_month(now.year, now.month, auth_token=auth_token)
 
 
 @app.get("/timesheet/month/{year}/{month}", tags=["Timesheet"])
-async def get_timesheet_month(year: int, month: int):
+async def get_timesheet_month(
+    year: int,
+    month: int,
+    format: str = Query("html", regex="^(html|json)$"),
+    auth_token: Optional[str] = Cookie(None)
+):
     """
-    Get timesheet data for a specific month.
+    Get timesheet data for a specific month. Requires authentication.
 
     Args:
         year: Year (e.g., 2026)
         month: Month (1-12)
+        format: Output format (html or json). Default: html
+        auth_token: Authentication token from cookie
 
     Returns:
-        Time blocks for the specified month
+        Time blocks for the specified month as HTML table or JSON
     """
+    from app.utils.auth import get_current_user
+
+    # Check authentication
+    try:
+        user = get_current_user(auth_token)
+    except HTTPException:
+        # Redirect to login
+        return RedirectResponse(url="/login", status_code=303)
+
     if not pb_client:
         raise HTTPException(status_code=503, detail="PocketBase client not initialized")
 
@@ -291,13 +336,20 @@ async def get_timesheet_month(year: int, month: int):
             for block in blocks_list
         )
 
-        return {
-            "year": year,
-            "month": month,
-            "time_blocks": blocks_list,
-            "total_hours": total_hours,
-            "count": len(blocks_list),
-        }
+        # Return JSON if requested
+        if format == "json":
+            return {
+                "year": year,
+                "month": month,
+                "time_blocks": blocks_list,
+                "total_hours": total_hours,
+                "count": len(blocks_list),
+            }
+
+        # Otherwise return simple HTML timesheet
+        from app.utils.timesheet_template import render_monthly_timesheet
+        html_content = render_monthly_timesheet(year, month, blocks_list, total_hours)
+        return HTMLResponse(content=html_content)
 
     except Exception as e:
         logger.error(f"Failed to fetch timesheet: {str(e)}", exc_info=True)
@@ -426,6 +478,324 @@ async def export_month(
     except Exception as e:
         logger.error(f"Export failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+# ============================================================================
+# User-Friendly Data Viewing Endpoints
+# ============================================================================
+
+
+@app.get("/viewer", response_class=HTMLResponse, tags=["Data Viewer"])
+async def data_viewer():
+    """
+    Interactive data viewer with copy-to-clipboard functionality.
+
+    Provides a beautiful web interface to view and copy all collection data.
+    """
+    from pathlib import Path
+
+    viewer_path = Path(__file__).parent.parent / "data_viewer.html"
+
+    if not viewer_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Data viewer not found. Make sure data_viewer.html exists in the project root."
+        )
+
+    with open(viewer_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+
+    return HTMLResponse(content=html_content)
+
+
+@app.get("/data/{collection}", tags=["Data Access"])
+async def get_collection_data(
+    collection: str,
+    format: str = Query("html", regex="^(html|json)$")
+):
+    """
+    Get all records from a collection in a user-friendly format.
+
+    Args:
+        collection: Collection name (settings, work_packages, project_specs,
+                   raw_events, time_blocks, week_summaries,
+                   calendar_accounts, email_accounts)
+        format: Output format (html or json). Default: html
+
+    Returns:
+        Collection data as HTML table or JSON
+    """
+    if not pb_client:
+        raise HTTPException(status_code=503, detail="PocketBase client not initialized")
+
+    # Valid collections
+    valid_collections = [
+        "settings",
+        "work_packages",
+        "project_specs",
+        "raw_events",
+        "time_blocks",
+        "week_summaries",
+        "calendar_accounts",
+        "email_accounts",
+    ]
+
+    if collection not in valid_collections:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid collection. Valid options: {', '.join(valid_collections)}"
+        )
+
+    try:
+        # Fetch all records (no sort for better compatibility)
+        records = pb_client.get_full_list(collection)
+
+        # Convert to dicts
+        records_list = []
+        for record in records:
+            if hasattr(record, "__dict__"):
+                record_dict = {
+                    k: v for k, v in record.__dict__.items()
+                    if not k.startswith("_")
+                }
+            else:
+                record_dict = dict(record)
+            records_list.append(record_dict)
+
+        # Return JSON if requested
+        if format == "json":
+            return {
+                "collection": collection,
+                "count": len(records_list),
+                "records": records_list,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+        # Otherwise return HTML
+        from app.utils.html_templates import render_collection_html
+        html_content = render_collection_html(collection, records_list)
+        return HTMLResponse(content=html_content)
+
+    except Exception as e:
+        logger.error(f"Failed to fetch {collection}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch data: {str(e)}"
+        )
+
+
+@app.get("/dashboard", tags=["Dashboard"])
+async def dashboard():
+    """
+    Get dashboard overview with system statistics and recent activity.
+
+    Returns:
+        System overview including record counts, recent data, and configuration
+    """
+    if not pb_client:
+        raise HTTPException(status_code=503, detail="PocketBase client not initialized")
+
+    try:
+        # Get counts for all collections
+        counts = {}
+        collections = [
+            "settings",
+            "work_packages",
+            "project_specs",
+            "raw_events",
+            "time_blocks",
+            "week_summaries",
+            "calendar_accounts",
+            "email_accounts",
+        ]
+
+        for collection in collections:
+            try:
+                counts[collection] = pb_client.count(collection)
+            except:
+                counts[collection] = 0
+
+        # Get recent raw events (last 10)
+        recent_events = []
+        try:
+            events = pb_client.get_list(
+                "raw_events",
+                page=1,
+                per_page=10,
+                sort="-created"
+            )
+            for event in events:
+                if hasattr(event, "__dict__"):
+                    event_dict = {
+                        k: v for k, v in event.__dict__.items()
+                        if not k.startswith("_")
+                    }
+                else:
+                    event_dict = dict(event)
+                recent_events.append(event_dict)
+        except:
+            pass
+
+        # Get recent time blocks (last 10)
+        recent_blocks = []
+        try:
+            blocks = pb_client.get_list(
+                "time_blocks",
+                page=1,
+                per_page=10,
+                sort="-created"
+            )
+            for block in blocks:
+                if hasattr(block, "__dict__"):
+                    block_dict = {
+                        k: v for k, v in block.__dict__.items()
+                        if not k.startswith("_")
+                    }
+                else:
+                    block_dict = dict(block)
+                recent_blocks.append(block_dict)
+        except:
+            pass
+
+        # Get configuration summary
+        config_summary = {}
+        if config and config.settings:
+            try:
+                settings = config.settings
+                config_summary = {
+                    "work_week": f"{settings.core.work_week_start_day.value} to {settings.core.work_week_end_day.value}",
+                    "target_hours": settings.core.target_hours_per_week,
+                    "auto_fill_enabled": settings.core.auto_fill_enabled,
+                    "wakatime_enabled": settings.wakatime.wakatime_enabled,
+                    "github_enabled": settings.github.github_enabled,
+                    "calendar_enabled": settings.calendar.calendar_enabled,
+                    "gmail_enabled": settings.gmail.gmail_enabled,
+                }
+            except:
+                pass
+
+        # Get scheduler status
+        scheduler_info = {}
+        if scheduler:
+            try:
+                scheduler_info = scheduler.get_job_status()
+            except:
+                pass
+
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "system_status": "operational",
+            "collection_counts": counts,
+            "recent_events": recent_events,
+            "recent_time_blocks": recent_blocks,
+            "configuration": config_summary,
+            "scheduler": scheduler_info,
+            "quick_links": {
+                "viewer": "/viewer",
+                "api_docs": "/docs",
+                "settings": "/data/settings",
+                "work_packages": "/data/work_packages",
+                "current_timesheet": "/timesheet/current",
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Dashboard failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Dashboard failed: {str(e)}"
+        )
+
+
+# ============================================================================
+# Authentication Endpoints
+# ============================================================================
+
+
+class LoginRequest(BaseModel):
+    """Login request model."""
+    email: str
+    password: str
+
+
+@app.get("/login", response_class=HTMLResponse, tags=["Authentication"])
+async def login_page():
+    """Show login page."""
+    from pathlib import Path
+
+    login_path = Path(__file__).parent.parent / "login.html"
+
+    if not login_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Login page not found"
+        )
+
+    with open(login_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+
+    return HTMLResponse(content=html_content)
+
+
+@app.post("/auth/login", tags=["Authentication"])
+async def login(request: LoginRequest, response: Response):
+    """
+    Authenticate user and set auth cookie.
+
+    Args:
+        request: Login credentials
+        response: FastAPI response to set cookie
+
+    Returns:
+        Success message and user data
+    """
+    from app.utils.auth import auth_service
+
+    try:
+        token, user_data = auth_service.authenticate(request.email, request.password)
+
+        # Set auth cookie (14 days expiry to match PocketBase)
+        response.set_cookie(
+            key="auth_token",
+            value=token,
+            max_age=14 * 24 * 60 * 60,  # 14 days
+            httponly=True,
+            samesite="lax",
+        )
+
+        return {
+            "success": True,
+            "message": "Login successful",
+            "user": user_data
+        }
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Login failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Login failed")
+
+
+@app.post("/auth/logout", tags=["Authentication"])
+async def logout(response: Response):
+    """Logout user by clearing auth cookie."""
+    response.delete_cookie(key="auth_token")
+    return {"success": True, "message": "Logged out successfully"}
+
+
+@app.get("/auth/me", tags=["Authentication"])
+async def get_current_user_info(user: dict = Depends(lambda: None)):
+    """Get current authenticated user info."""
+    from app.utils.auth import get_current_user
+    from fastapi import Cookie
+
+    auth_token = Cookie(None)
+
+    try:
+        user_data = get_current_user(auth_token)
+        return {"authenticated": True, "user": user_data}
+    except:
+        return {"authenticated": False, "user": None}
 
 
 # ============================================================================
