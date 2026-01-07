@@ -1,0 +1,37 @@
+[Unit]
+Description=PocketBase Server for Mission42 Timesheet
+Documentation=https://pocketbase.io/docs/
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mission42-timesheet/pocketbase
+ExecStart=/opt/mission42-timesheet/pocketbase/pocketbase serve --http=127.0.0.1:8090
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pocketbase
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mission42-timesheet/pocketbase/pb_data
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

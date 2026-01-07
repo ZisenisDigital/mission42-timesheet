@@ -1,0 +1,50 @@
+[Unit]
+Description=Mission42 Timesheet API Service
+Documentation=https://github.com/ZisenisDigital/mission42-timesheet
+After=network.target pocketbase.service
+Requires=pocketbase.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mission42-timesheet
+
+# Environment setup
+Environment="PATH=/opt/mission42-timesheet/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/opt/mission42-timesheet/.env.production
+
+# Start command
+ExecStartPre=/bin/sleep 5
+ExecStartPre=/opt/mission42-timesheet/.venv/bin/python scripts/seed_settings.py
+ExecStartPre=/opt/mission42-timesheet/.venv/bin/python scripts/seed_work_packages.py
+ExecStartPre=/opt/mission42-timesheet/.venv/bin/python scripts/seed_project_specs.py
+ExecStart=/opt/mission42-timesheet/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mission42-api
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mission42-timesheet/logs
+ReadWritePaths=/opt/mission42-timesheet/pocketbase/pb_data
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryLimit=2G
+
+[Install]
+WantedBy=multi-user.target

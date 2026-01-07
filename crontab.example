@@ -1,0 +1,20 @@
+# Mission42 Timesheet Cron Jobs
+# Copy this file and adjust paths/schedule as needed
+# To install: crontab -e (then paste relevant lines)
+
+# Backup PocketBase data daily at 2 AM
+0 2 * * * /opt/mission42-timesheet/scripts/backup.sh >> /var/log/mission42-backup.log 2>&1
+
+# Database maintenance weekly on Sunday at 3 AM
+0 3 * * 0 /opt/mission42-timesheet/scripts/maintain_db.sh >> /var/log/mission42-maintenance.log 2>&1
+
+# Optional: Check API health every 5 minutes and alert if down
+# */5 * * * * curl -f http://localhost:8000/health || echo "Mission42 API is down!" | mail -s "Alert: Mission42 API Down" admin@example.com
+
+# Optional: Rotate logs weekly
+# 0 4 * * 0 find /var/log/mission42-* -name "*.log" -mtime +30 -delete
+
+# Environment variables for scripts (adjust as needed)
+# BACKUP_DIR=/backups/mission42-timesheet
+# POCKETBASE_DATA_DIR=/opt/mission42-timesheet/pocketbase/pb_data
+# RETENTION_DAYS=30

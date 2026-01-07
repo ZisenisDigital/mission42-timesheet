@@ -22,12 +22,10 @@ from app.pocketbase_client import PocketBaseClient
 from app.config import Config
 from app.services.scheduler import SchedulerService
 from app.services.exporters import MonthlyExporter
+from app.utils.logging_config import configure_logging_from_env
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+# Configure logging from environment
+configure_logging_from_env()
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
