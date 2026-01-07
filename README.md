@@ -77,16 +77,25 @@ PocketBase (Port 8090)          FastAPI Processor (Port 8000)
    ```
    Access admin UI at: http://localhost:8090/_/
 
-6. **Setup PocketBase collections and seed settings**
+6. **Setup PocketBase collections and seed data**
    ```bash
    # Run migrations (when PocketBase is running)
    cd pocketbase && ./pocketbase migrate
 
    # Seed default settings (31 configuration values)
    python scripts/seed_settings.py
+
+   # Seed work packages (6 default categories)
+   python scripts/seed_work_packages.py
+
+   # Seed project specs (6 default specifications)
+   python scripts/seed_project_specs.py
    ```
 
-7. **Start FastAPI processor**
+7. **Configure OAuth (optional)**
+   For Google Calendar and Gmail integration, see [OAuth Setup Guide](docs/OAUTH_GUIDE.md)
+
+8. **Start FastAPI processor**
    ```bash
    python app/main.py
    ```
@@ -304,9 +313,15 @@ See [MASTER_PLAN.md](MASTER_PLAN.md) Phase 9 for deployment options:
 
 ## Documentation
 
-- **Master Plan**: [MASTER_PLAN.md](MASTER_PLAN.md) - Complete implementation plan
-- **API Docs**: http://localhost:8000/docs (when running)
-- **PocketBase Docs**: https://pocketbase.io/docs/
+- **Setup & Administration**:
+  - [Admin Guide](docs/ADMIN_GUIDE.md) - Complete PocketBase admin guide
+  - [OAuth Setup Guide](docs/OAUTH_GUIDE.md) - Google Calendar, Gmail, GitHub setup
+  - [Settings Documentation](SETTINGS_DOCUMENTATION.md) - All 31 settings explained
+- **Development**:
+  - [Master Plan](MASTER_PLAN.md) - Complete implementation plan
+  - [API Docs](http://localhost:8000/docs) - FastAPI documentation (when running)
+- **External Resources**:
+  - [PocketBase Docs](https://pocketbase.io/docs/) - Database documentation
 
 ## Troubleshooting
 
