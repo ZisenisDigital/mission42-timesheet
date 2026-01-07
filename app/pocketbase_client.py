@@ -366,12 +366,10 @@ class PocketBaseClient:
         week_start: datetime,
         block_start: datetime,
         block_end: datetime,
-        work_package: str,
-        project_spec: str,
-        description: str,
         source: str,
-        priority: int,
-        is_auto_filled: bool = False,
+        description: str,
+        duration_hours: float,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Record:
         """
         Create a time block record.
@@ -380,12 +378,10 @@ class PocketBaseClient:
             week_start: Start of the work week
             block_start: Start of time block
             block_end: End of time block
-            work_package: Work package name
-            project_spec: Project specification name
-            description: Block description
             source: Source name
-            priority: Source priority
-            is_auto_filled: Whether this block was auto-filled
+            description: Block description
+            duration_hours: Duration in hours
+            metadata: Additional metadata as JSON
 
         Returns:
             Created time_blocks record
@@ -396,12 +392,10 @@ class PocketBaseClient:
                 "week_start": week_start.isoformat(),
                 "block_start": block_start.isoformat(),
                 "block_end": block_end.isoformat(),
-                "work_package": work_package,
-                "project_spec": project_spec,
-                "description": description,
                 "source": source,
-                "priority": priority,
-                "is_auto_filled": is_auto_filled,
+                "description": description,
+                "duration_hours": duration_hours,
+                "metadata": metadata or {},
             },
         )
 
@@ -421,70 +415,45 @@ class PocketBaseClient:
         )
 
     def get_or_create_week_summary(
-        self, week_start: datetime
-    ) -> tuple[Record, bool]:
+        self,
+        week_start: datetime,
+        total_hours: float = 0.0,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Record:
         """
         Get or create week summary record.
 
         Args:
             week_start: Start of the work week
+            total_hours: Total hours for the week
+            metadata: Additional metadata as JSON
 
         Returns:
-            Tuple of (record, created) where created is True if newly created
+            Week summary record
         """
         filter_str = f'week_start="{week_start.isoformat()}"'
 
         try:
             record = self.get_first_list_item(self.COLLECTION_WEEK_SUMMARIES, filter_str)
-            return (record, False)
+            # Update existing record
+            return self.update(
+                self.COLLECTION_WEEK_SUMMARIES,
+                record.id,
+                {
+                    "total_hours": total_hours,
+                    "metadata": metadata or {},
+                },
+            )
         except ClientResponseError as e:
             if e.status == 404:
                 # Create new summary
-                record = self.create(
+                return self.create(
                     self.COLLECTION_WEEK_SUMMARIES,
                     {
                         "week_start": week_start.isoformat(),
-                        "total_hours": 0.0,
-                        "tracked_hours": 0.0,
-                        "auto_filled_hours": 0.0,
-                        "carry_over_hours": 0.0,
-                        "processed_at": datetime.utcnow().isoformat(),
+                        "total_hours": total_hours,
+                        "metadata": metadata or {},
                     },
                 )
-                return (record, True)
             raise
 
-    def update_week_summary(
-        self,
-        week_start: datetime,
-        total_hours: float,
-        tracked_hours: float,
-        auto_filled_hours: float,
-        carry_over_hours: float,
-    ) -> Record:
-        """
-        Update week summary with calculated values.
-
-        Args:
-            week_start: Start of the work week
-            total_hours: Total hours for the week
-            tracked_hours: Actually tracked hours
-            auto_filled_hours: Auto-filled hours
-            carry_over_hours: Carry-over hours (excess above target)
-
-        Returns:
-            Updated week_summaries record
-        """
-        record, _ = self.get_or_create_week_summary(week_start)
-
-        return self.update(
-            self.COLLECTION_WEEK_SUMMARIES,
-            record.id,
-            {
-                "total_hours": total_hours,
-                "tracked_hours": tracked_hours,
-                "auto_filled_hours": auto_filled_hours,
-                "carry_over_hours": carry_over_hours,
-                "processed_at": datetime.utcnow().isoformat(),
-            },
-        )
