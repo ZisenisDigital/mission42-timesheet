@@ -317,8 +317,10 @@ See [MASTER_PLAN.md](MASTER_PLAN.md) Phase 9 for deployment options:
   - [Admin Guide](docs/ADMIN_GUIDE.md) - Complete PocketBase admin guide
   - [OAuth Setup Guide](docs/OAUTH_GUIDE.md) - Google Calendar, Gmail, GitHub setup
   - [Settings Documentation](SETTINGS_DOCUMENTATION.md) - All 31 settings explained
+  - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment instructions
 - **Development**:
   - [Master Plan](MASTER_PLAN.md) - Complete implementation plan
+  - [Contributing Guidelines](docs/CONTRIBUTING.md) - How to contribute to the project
   - [API Docs](http://localhost:8000/docs) - FastAPI documentation (when running)
 - **External Resources**:
   - [PocketBase Docs](https://pocketbase.io/docs/) - Database documentation
