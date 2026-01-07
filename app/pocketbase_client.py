@@ -345,6 +345,22 @@ class PocketBaseClient:
         filter_str = " && ".join(filters)
         return self.get_full_list(self.COLLECTION_RAW_EVENTS, filter=filter_str, sort="+timestamp")
 
+    def get_raw_events_for_week(
+        self, week_start: datetime, week_end: datetime
+    ) -> List[Record]:
+        """
+        Get all raw events for a work week.
+
+        Args:
+            week_start: Start of work week
+            week_end: End of work week
+
+        Returns:
+            List of raw event records
+        """
+        filter_str = f'timestamp>="{week_start.isoformat()}" && timestamp<="{week_end.isoformat()}"'
+        return self.get_full_list(self.COLLECTION_RAW_EVENTS, filter=filter_str, sort="+timestamp")
+
     def create_time_block(
         self,
         week_start: datetime,
