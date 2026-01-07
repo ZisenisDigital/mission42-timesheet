@@ -30,7 +30,7 @@ class SourcePriority(IntEnum):
     # Lower priority: GitHub activity (may overlap with WakaTime)
     GITHUB = 40
 
-    # Lower priority: Cloud events (user-defined events)
+    # Lower priority: Claude Code events (AI assistant usage tracking)
     CLOUD_EVENTS = 40
 
     # Lowest priority: Auto-filled hours

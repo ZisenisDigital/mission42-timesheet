@@ -5,7 +5,7 @@
 Automated timesheet system that aggregates time tracking data from multiple sources, processes them into 30-minute blocks, and automatically fills work weeks to 40 hours.
 
 **Key Features:**
-- Multi-source data aggregation (WakaTime, Google Calendar, Gmail, GitHub, Cloud Events)
+- Multi-source data aggregation (WakaTime, Google Calendar, Gmail, GitHub, Claude Code Events)
 - Priority-based overlap resolution
 - Automatic 40-hour weekly fill-up (Monday 6 PM trigger)
 - 30-minute block granularity
@@ -43,7 +43,7 @@ Automated timesheet system that aggregates time tracking data from multiple sour
         ├─── Google Calendar API
         ├─── Gmail API
         ├─── GitHub API
-        └─── PocketBase Cloud Events
+        └─── PocketBase Claude Code Events
 ```
 
 ---
@@ -86,7 +86,7 @@ When events overlap, higher priority wins:
 | High | Calendar meetings | 80 |
 | Medium-High | Sent emails | 60 |
 | Lower | GitHub commits | 40 |
-| Lower | Cloud events | 40 |
+| Lower | Claude Code events | 40 |
 
 ### Data Sources
 
@@ -109,9 +109,10 @@ When events overlap, higher priority wins:
 - Track commits
 - Estimate duration based on changes
 
-**Cloud Events:**
-- Custom events from PocketBase table
-- User-defined activity tracking
+**Claude Code Events:**
+- Custom events from PocketBase cloud_events table
+- Track Claude Code AI assistant usage and sessions
+- User-defined activity tracking for AI-assisted work
 
 ---
 
@@ -311,15 +312,15 @@ Weekly hour summaries
 | processed_at | date | | | Last processing timestamp |
 
 ### 9. cloud_events
-Custom cloud events (user-defined)
+Claude Code AI assistant usage events
 
 | Field | Type | Required | Unique | Description |
 |-------|------|----------|--------|-------------|
-| event_type | text | ✓ | | Type of cloud event |
+| event_type | text | ✓ | | Type of Claude Code event (session, task, etc.) |
 | timestamp | date | ✓ | | Event timestamp |
 | duration_minutes | number | | | Duration in minutes |
-| description | text | | | Event description |
-| metadata | json | | | Additional metadata |
+| description | text | | | Event description (e.g., "Claude Code: Implemented feature X") |
+| metadata | json | | | Additional metadata (session_id, task_type, etc.) |
 
 ---
 
@@ -432,8 +433,8 @@ FASTAPI_PORT=8000
    - [ ] Estimate duration from commit size
    - [ ] Save to `raw_events` collection
 
-5. **Cloud Events Fetcher**
-   - [ ] Read from `cloud_events` collection
+5. **Claude Code Events Fetcher**
+   - [ ] Read from `cloud_events` collection (stores Claude Code usage)
    - [ ] Convert to `raw_events` format
 
 **Deliverables:**

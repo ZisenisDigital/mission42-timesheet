@@ -244,13 +244,13 @@ SETTINGS_DATA = [
         "validation_rules": {}
     },
 
-    # ===== CLOUD EVENTS SETTINGS (1) =====
+    # ===== CLAUDE CODE EVENTS SETTINGS (1) =====
     {
         "key": "cloud_events_enabled",
         "value": "true",
         "type": "boolean",
         "category": "cloud_events",
-        "description": "Enable custom cloud events tracking (priority: 40)",
+        "description": "Enable Claude Code AI assistant usage tracking (priority: 40)",
         "validation_rules": {}
     },
 
