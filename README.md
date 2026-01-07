@@ -77,10 +77,13 @@ PocketBase (Port 8090)          FastAPI Processor (Port 8000)
    ```
    Access admin UI at: http://localhost:8090/_/
 
-6. **Setup PocketBase collections**
+6. **Setup PocketBase collections and seed settings**
    ```bash
-   python scripts/setup_pocketbase.py
-   python scripts/seed_data.py
+   # Run migrations (when PocketBase is running)
+   cd pocketbase && ./pocketbase migrate
+
+   # Seed default settings (31 configuration values)
+   python scripts/seed_settings.py
    ```
 
 7. **Start FastAPI processor**
@@ -92,16 +95,119 @@ PocketBase (Port 8090)          FastAPI Processor (Port 8000)
 
 ## Configuration
 
-All configuration is managed through PocketBase admin UI (http://localhost:8090/_/).
+All configuration is managed through PocketBase admin UI (http://localhost:8090/_/collections?collectionId=settings).
 
-### Key Settings
+### Settings Overview
 
-- **Work Week**: Monday 6 PM → Saturday 6 PM
-- **Target Hours**: 40 hours per week
-- **Fetch Interval**: Every 5 hours
-- **Auto-fill**: Enabled (Mondays only)
-- **Time Block Size**: 30 minutes
-- **Minimum Task Duration**: 15 minutes (rounded to 30 min)
+The system has **31 configuration settings** organized into 8 categories:
+
+| Category | Count | Description |
+|----------|-------|-------------|
+| Core | 10 | Work week definition, scheduling, auto-fill behavior |
+| WakaTime | 1 | Coding time tracking configuration |
+| Calendar | 2 | Google Calendar meeting tracking |
+| Gmail | 3 | Email activity tracking |
+| GitHub | 5 | Repository activity tracking |
+| Cloud Events | 1 | Custom event tracking |
+| Processing | 7 | Time block processing rules |
+| Export | 2 | Timesheet export formatting |
+
+### Core Settings (10)
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `work_week_start_day` | string | monday | Day of week when work week starts |
+| `work_week_start_time` | string | 18:00 | Time when work week starts (24-hour format) |
+| `work_week_end_day` | string | saturday | Day of week when work week ends |
+| `work_week_end_time` | string | 18:00 | Time when work week ends |
+| `target_hours_per_week` | number | 40 | Target hours to track per week (1-168) |
+| `fetch_interval_hours` | number | 5 | How often to fetch data from sources (1-24) |
+| `time_block_size_minutes` | number | 30 | Size of time blocks (fixed at 30) |
+| `auto_fill_enabled` | boolean | true | Enable automatic filling to target hours |
+| `auto_fill_day` | string | monday | Day when auto-fill runs |
+| `default_location` | string | Remote | Default location for time entries |
+
+### Data Source Settings
+
+#### WakaTime (1)
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `wakatime_enabled` | true | Enable WakaTime coding activity tracking |
+
+#### Google Calendar (2)
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `calendar_enabled` | true | Enable Google Calendar meeting tracking |
+| `calendar_monitored_emails` | "" | Comma-separated calendar emails to monitor |
+
+#### Gmail (3)
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `gmail_enabled` | true | Enable Gmail sent email tracking |
+| `gmail_monitored_recipients` | "" | Comma-separated recipient emails to track |
+| `gmail_default_duration_minutes` | 30 | Default duration per sent email (5-240) |
+
+#### GitHub (5)
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `github_enabled` | true | Enable GitHub activity tracking |
+| `github_repositories` | "" | Comma-separated repos (format: owner/repo) |
+| `github_track_commits` | true | Track commit activity |
+| `github_track_issues` | true | Track assigned issue activity |
+| `github_track_prs` | false | Track pull request review activity |
+
+#### Cloud Events (1)
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `cloud_events_enabled` | true | Enable custom cloud events tracking |
+
+### Processing Settings (7)
+
+| Setting | Default | Description | Valid Values |
+|---------|---------|-------------|--------------|
+| `rounding_mode` | up | How to round time to 0.5h blocks | `up`, `nearest` |
+| `group_same_activities` | false | Group identical activities in same day | - |
+| `fill_up_topic_mode` | manual | How to determine auto-fill topic | `manual`, `auto`, `generic` |
+| `fill_up_default_topic` | General | Default topic for auto-filled hours | Any string (max 100 chars) |
+| `fill_up_distribution` | end_of_week | How to distribute auto-filled hours | `end_of_week`, `distributed`, `empty_slots` |
+| `overlap_handling` | priority | How to handle overlapping time blocks | `priority`, `show_both`, `combine` |
+| `max_carry_over_hours` | 2000 | Maximum accumulated carry-over hours (0-10000) | - |
+
+### Export Settings (2)
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `export_show_weekly_breakdown` | false | Show weekly totals in monthly export |
+| `export_title_name` | Koni | Name in export title (e.g., "Zeiterfassung - {name}") |
+
+### Managing Settings
+
+**Via PocketBase Admin UI:**
+1. Open http://localhost:8090/_/
+2. Navigate to "Collections" → "settings"
+3. Click on any setting to edit its value
+4. Changes take effect on next fetch/process cycle
+
+**Via Python API:**
+```python
+from app.config import config
+
+# Get all settings
+settings = config.settings.get_all()
+print(settings.core.target_hours_per_week)  # 40
+
+# Update a single setting
+config.settings.update("target_hours_per_week", 35)
+
+# Update multiple settings
+config.settings.update_many({
+    "target_hours_per_week": 35,
+    "fetch_interval_hours": 3
+})
+
+# Force reload from database
+settings = config.settings.reload()
+```
 
 ### Adding Data Sources
 
