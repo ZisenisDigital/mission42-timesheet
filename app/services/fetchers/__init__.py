@@ -8,5 +8,6 @@ from app.services.fetchers.base import BaseFetcher, FetchResult
 from app.services.fetchers.wakatime_fetcher import WakaTimeFetcher
 from app.services.fetchers.calendar_fetcher import CalendarFetcher
 from app.services.fetchers.gmail_fetcher import GmailFetcher
+from app.services.fetchers.github_fetcher import GitHubFetcher
 
-__all__ = ["BaseFetcher", "FetchResult", "WakaTimeFetcher", "CalendarFetcher", "GmailFetcher"]
+__all__ = ["BaseFetcher", "FetchResult", "WakaTimeFetcher", "CalendarFetcher", "GmailFetcher", "GitHubFetcher"]
